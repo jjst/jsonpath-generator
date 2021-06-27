@@ -32,7 +32,7 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
         }
       }
     }
-    "the current json is an object" should {
+    "the current json is an array" should {
       "return valid index selectors" in {
         val jsonObject = Json.arr(
           Json.fromInt(1),
@@ -48,7 +48,18 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
           IndexArray(ArrayIndex.Selection(Seq(-1))),
         )
       }
+    }
+    "the current json is an object" should {
       "return valid field selectors" in {
+        val jsonObject = Json.obj(
+          "field1" -> Json.fromInt(1),
+        "field2" -> Json.fromInt(1)
+        )
+        val exp = new JsonPathExpression(jsonObject, tokens = List(Begin))
+        exp.nextValidTokens should contain theSameElementsAs Set(
+          SelectField("field1"),
+          SelectField("field2")
+        )
       }
     }
   }

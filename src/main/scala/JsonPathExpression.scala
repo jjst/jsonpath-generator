@@ -7,14 +7,20 @@ class JsonPathExpression(val json: Json, val tokens: List[JsonPathToken]) {
   private def fieldSelectors(o: JsonObject): Set[JsonPathToken] =
     o.keys.map(SelectField.apply).toSet
 
-  private def indexSelectors(array: Vector[Json]): Set[JsonPathToken] = {
+  private def indexSelectors(lastToken: JsonPathToken)(array: Vector[Json]): Set[JsonPathToken] = {
     if (array.isEmpty) {
       Set.empty
     } else {
-      val positiveIndices = array.indices.map(i => ArrayIndex.Selection(Seq(i)))
-      (positiveIndices ++ Seq(ArrayIndex.Selection(Seq(-1)), ArrayIndex.Wildcard))
-        .map(IndexArray.apply)
-        .toSet
+      lastToken match {
+        // Nesting index selectors is invalid
+        case _: JsonPathToken.IndexArray => Set.empty
+        case _ => {
+          val positiveIndices = array.indices.map(i => ArrayIndex.Selection(Seq(i)))
+          (positiveIndices ++ Seq(ArrayIndex.Selection(Seq(-1)), ArrayIndex.Wildcard))
+            .map(IndexArray.apply)
+            .toSet
+        }
+      }
     }
   }
 
@@ -22,17 +28,21 @@ class JsonPathExpression(val json: Json, val tokens: List[JsonPathToken]) {
     if (json.isNull) {
       Set.empty
     }
-    else if (tokens.isEmpty) {
-      Set(JsonPathToken.Begin)
-    } else {
-      json.fold(
-        Set.empty,
-        _ => Set.empty,
-        _ => Set.empty,
-        _ => Set.empty,
-        indexSelectors,
-        fieldSelectors
-      )
+    else {
+      tokens match {
+        case Nil =>
+          Set(JsonPathToken.Begin)
+        case lastToken :: _ => {
+          json.fold(
+            Set.empty,
+            _ => Set.empty,
+            _ => Set.empty,
+            _ => Set.empty,
+            indexSelectors(lastToken),
+            fieldSelectors
+          )
+        }
+      }
     }
   }
 
@@ -47,13 +57,31 @@ class JsonPathExpression(val json: Json, val tokens: List[JsonPathToken]) {
 
  private def select(json: Json, token: JsonPathToken): Json = {
    token match {
-     case JsonPathToken.Begin => json
-     case _ => ???
+     case JsonPathToken.Begin =>
+       json
+     case JsonPathToken.SelectField(field) =>
+       json.asObject.flatMap(_.apply(field)).getOrElse(json)
+     case JsonPathToken.IndexArray(index) => {
+       json.asArray.map { array =>
+         val filtered = index match {
+           case ArrayIndex.Selection(indices) =>
+             indices.map { i =>
+               // Support negative indices
+               if (i >= 0) array(i) else array(array.length + i)
+             }
+           case ArrayIndex.Range(from, to) =>
+             (from to to).map(array.apply)
+           case ArrayIndex.Wildcard =>
+             array
+         }
+         Json.arr(filtered: _*)
+       }.getOrElse(json)
+     }
    }
  }
 
   def text: String = {
-    tokens.map(_.text).mkString("")
+    tokens.reverse.map(_.text).mkString("")
   }
 }
 
