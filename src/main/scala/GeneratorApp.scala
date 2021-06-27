@@ -1,14 +1,15 @@
+import io.circe.Json
 import org.json.JSONObject
 
 object GeneratorApp extends App {
-  val json = new JSONObject()
+  val json = Json.Null
   println(JsonPathExpression.Empty(json).text)
   println(JsonPathExpression.Empty(json).nextValidTokens)
 }
 
-class JsonPathExpression(json: JSONObject, tokens: List[JsonPathToken]) {
+class JsonPathExpression(json: Json, tokens: List[JsonPathToken]) {
   lazy val nextValidTokens: Set[JsonPathToken] = {
-    if (json.isEmpty) {
+    if (json.isNull) {
       Set.empty
     }
     else if (tokens.isEmpty) {
@@ -27,7 +28,7 @@ class JsonPathExpression(json: JSONObject, tokens: List[JsonPathToken]) {
 }
 
 object JsonPathExpression {
-  def Empty(json: JSONObject): JsonPathExpression =
+  def Empty(json: Json): JsonPathExpression =
     new JsonPathExpression(json, List.empty)
 }
 
