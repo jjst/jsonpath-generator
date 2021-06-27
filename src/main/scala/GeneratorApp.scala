@@ -12,7 +12,7 @@ object GeneratorApp extends App {
   parse(jsonStr) match {
     case Left(failure) => println(failure)
     case Right(json) => {
-      val expressions = JsonPathGenerator.stream(json)
+      val expressions = JsonPathExpression.generateAll(json)
       println(expressions.toList.map(_.text))
     }
   }

@@ -1,26 +1,42 @@
 import JsonPathToken.{IndexArray, SelectField}
+import io.circe
 import io.circe.{Json, JsonObject}
 
 case class InvalidJsonPathException(err: String) extends RuntimeException(err)
 
-class JsonPathExpression(val json: Json, val tokens: List[JsonPathToken]) {
-  private def fieldSelectors(o: JsonObject): Set[JsonPathToken] =
-    o.keys.map(SelectField.apply).toSet
+case class JsonPathExpression(json: Json, tokens: List[JsonPathToken]) {
+  private def fieldSelectors(lastToken: JsonPathToken)(json: Json): Set[JsonPathToken] = {
+    def selectFields(o: JsonObject): Set[JsonPathToken] =
+      o.keys.map(SelectField.apply).toSet
+    json.fold(
+      Set.empty,
+      _ => Set.empty,
+      _ => Set.empty,
+      _ => Set.empty,
+      arr => if (lastToken.isIndexSelector) arr.flatMap(fieldSelectors(lastToken)).toSet else Set.empty,
+      selectFields
+    )
+  }
 
-  private def indexSelectors(lastToken: JsonPathToken)(array: Vector[Json]): Set[JsonPathToken] = {
-    if (array.isEmpty) {
-      Set.empty
-    } else {
-      lastToken match {
-        // Nesting index selectors is invalid
-        case _: JsonPathToken.IndexArray => Set.empty
-        case _ => {
-          val positiveIndices = array.indices.map(i => ArrayIndex.Selection(Seq(i)))
-          (positiveIndices ++ Seq(ArrayIndex.Selection(Seq(-1)), ArrayIndex.Wildcard))
-            .map(IndexArray.apply)
-            .toSet
+  private def indexSelectors(lastToken: JsonPathToken)(json: Json): Set[JsonPathToken] = {
+    json.asArray match {
+      case Some(array) => {
+        if (array.isEmpty) {
+          Set.empty
+        } else {
+          lastToken match {
+            // Nesting index selectors is invalid
+            case _: JsonPathToken.IndexArray => Set.empty
+            case _ => {
+              val positiveIndices = array.indices.map(i => ArrayIndex.Selection(Seq(i)))
+              (positiveIndices ++ Seq(ArrayIndex.Selection(Seq(-1)), ArrayIndex.Wildcard))
+                .map(IndexArray.apply)
+                .toSet
+            }
+          }
         }
       }
+      case None => Set.empty
     }
   }
 
@@ -33,14 +49,7 @@ class JsonPathExpression(val json: Json, val tokens: List[JsonPathToken]) {
         case Nil =>
           Set(JsonPathToken.Begin)
         case lastToken :: _ => {
-          json.fold(
-            Set.empty,
-            _ => Set.empty,
-            _ => Set.empty,
-            _ => Set.empty,
-            indexSelectors(lastToken),
-            fieldSelectors
-          )
+          fieldSelectors(lastToken)(json) ++ indexSelectors(lastToken)(json)
         }
       }
     }
@@ -59,8 +68,16 @@ class JsonPathExpression(val json: Json, val tokens: List[JsonPathToken]) {
    token match {
      case JsonPathToken.Begin =>
        json
-     case JsonPathToken.SelectField(field) =>
-       json.asObject.flatMap(_.apply(field)).getOrElse(json)
+     case JsonPathToken.SelectField(field) => {
+       json.fold(
+         json,
+         _ => json,
+         _ => json,
+         _ => json,
+         arr => Json.arr(arr.map(json => select(json, token)): _*),
+         o => o(field).getOrElse(Json.Null),
+       )
+     }
      case JsonPathToken.IndexArray(index) => {
        json.asArray.map { array =>
          val filtered = index match {
@@ -88,22 +105,42 @@ class JsonPathExpression(val json: Json, val tokens: List[JsonPathToken]) {
 object JsonPathExpression {
   def Empty(json: Json): JsonPathExpression =
     new JsonPathExpression(json, List.empty)
+
+  def generateAll(json: Json): LazyList[JsonPathExpression] = {
+    val expr = JsonPathExpression.Empty(json)
+    stream(expr)
+  }
+
+  private def stream(expr: JsonPathExpression): LazyList[JsonPathExpression] = {
+    val nextExpressions = expr.nextValidTokens.to(LazyList).map(expr.add)
+    nextExpressions.flatMap { e =>
+      e #:: stream(e)
+    }
+  }
 }
 
 sealed trait JsonPathToken {
   def text: String
+  def isIndexSelector: Boolean
+  def isFieldSelector: Boolean
 }
 
 object JsonPathToken {
   object Begin extends JsonPathToken {
     val text = "$"
+    override def isIndexSelector: Boolean = false
+    override def isFieldSelector: Boolean = false
   }
 
   case class SelectField(fieldName: String) extends JsonPathToken {
     val text = s".$fieldName"
+    override def isIndexSelector: Boolean = false
+    override def isFieldSelector: Boolean = true
   }
 
   case class IndexArray(index: ArrayIndex) extends JsonPathToken {
+    override def isIndexSelector: Boolean = true
+    override def isFieldSelector: Boolean = false
     val text = {
       val idxText = index match {
         case ArrayIndex.Selection(idx) =>

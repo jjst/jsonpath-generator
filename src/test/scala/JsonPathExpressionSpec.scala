@@ -37,7 +37,7 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
         val jsonObject = Json.arr(
           Json.fromInt(1),
           Json.fromString("hi"),
-          Json.obj("f" -> Json.fromInt(1)),
+          Json.obj("field" -> Json.fromInt(1)),
         )
         val exp = new JsonPathExpression(jsonObject, tokens = List(Begin))
         exp.nextValidTokens should contain theSameElementsAs Set(
@@ -84,6 +84,35 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
           newExp.json shouldBe json
         }
       }
+    }
+  }
+
+  "JsonPathExpress.generateAll" should {
+    "generate all possible supported jsonpath expressions for object" in {
+      val json = Json.obj(
+        "field1" -> Json.fromInt(1)
+      )
+      val allJsonPath = JsonPathExpression.generateAll(json)
+      allJsonPath.map(_.text).toList should contain theSameElementsAs Seq(
+        "$",
+        "$.field1"
+      )
+    }
+
+    "generate all possible supported jsonpath expressions" in {
+      val json = Json.arr(
+        Json.obj("field1" -> Json.fromInt(1))
+      )
+      val allJsonPath = JsonPathExpression.generateAll(json)
+      allJsonPath.map(_.text).toList should contain theSameElementsAs Seq(
+        "$",
+        "$[0]",
+        "$[-1]",
+        "$[*]",
+        "$[0].field1",
+        "$[-1].field1",
+        "$[*].field1",
+      )
     }
   }
 }
