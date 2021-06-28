@@ -3,7 +3,11 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import JsonPathToken._
+import com.jayway.jsonpath.JsonPath
+import io.circe.parser.parse
 import org.scalatest.AppendedClues.convertToClueful
+
+import scala.io.Source
 
 
 class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
@@ -115,6 +119,25 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
         val allJsonPaths = JsonPathExpression.generateAll(json)
         val jsonpaths = allJsonPaths.map(_.text).toList
         jsonpaths should contain theSameElementsAs expected withClue(s"${jsonpaths.toSet.diff(expected.toSet)} - ${expected.toSet.diff(jsonpaths.toSet)}")
+      }
+    }
+
+    "generate valid jsonpath expressions" in {
+      val testFiles = Table(
+        "Test file",
+        "auto-generated.json",
+        "cheriefm.json",
+        "skyrock.json"
+      )
+      forAll(testFiles) { testFile =>
+        val jsonString = Source.fromResource(s"json/${testFile}").mkString
+        import org.scalatest.Inspectors._
+        val json = parse(jsonString).getOrElse(fail("Invalid json"))
+        val allJsonPaths = JsonPathExpression.generateAll(json)
+        // All generate jsonpath expressions should be valid
+        forAll(allJsonPaths) { jsonPathExpr =>
+          val result: AnyRef = JsonPath.read(jsonString, jsonPathExpr.text)
+        }
       }
     }
   }

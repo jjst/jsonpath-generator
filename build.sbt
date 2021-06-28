@@ -20,3 +20,5 @@ libraryDependencies += "org.scalactic" %% "scalactic" % "3.2.9"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.9" % "test"
 
 libraryDependencies += "org.typelevel" %% "cats-core" % "2.3.0"
+
+libraryDependencies += "com.jayway.jsonpath" % "json-path" % "2.6.0" % "test"
