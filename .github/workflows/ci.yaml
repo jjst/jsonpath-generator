@@ -4,13 +4,24 @@ on:
   push:
 jobs:
   test:
+    name: Run tests
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v1
+
     - name: Setup Scala
       uses: olafurpg/setup-scala@v10
       with:
         java-version: "adopt@1.8"
+
+    - name: Cache SBT
+    uses: actions/cache@v2
+    with:
+      path: |
+        ~/.ivy2/cache
+        ~/.sbt
+      key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+
     - name: Build and Test
       run: sbt -v -Dfile.encoding=UTF-8 +test
