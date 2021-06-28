@@ -19,9 +19,9 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
   )
   "JsonPathExpression.nextValidTokens" when {
     "the current json is null" should {
-      "return the empty set" in {
+      "return a set with the anchor token only" in {
         val exp = JsonPathExpression.Empty(Json.Null)
-        exp.nextValidTokens shouldBe Set.empty
+        exp.nextValidTokens shouldBe Set(JsonPathToken.Begin)
       }
     }
     "the current json is not null and the jsonpath expression is empty" should {
@@ -39,7 +39,7 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
           Json.fromString("hi"),
           Json.obj("field" -> Json.fromInt(1)),
         )
-        val exp = new JsonPathExpression(jsonObject, tokens = List(Begin))
+        val exp = new JsonPathExpression(JsonPathSelection.Single(jsonObject), tokens = List(Begin))
         exp.nextValidTokens should contain theSameElementsAs Set(
           IndexArray(ArrayIndex.Wildcard),
           IndexArray(ArrayIndex.Selection(Seq(0))),
@@ -55,7 +55,7 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
           "field1" -> Json.fromInt(1),
         "field2" -> Json.fromInt(1)
         )
-        val exp = new JsonPathExpression(jsonObject, tokens = List(Begin))
+        val exp = new JsonPathExpression(JsonPathSelection.Single(jsonObject), tokens = List(Begin))
         exp.nextValidTokens should contain theSameElementsAs Set(
           SelectField("field1"),
           SelectField("field2")
@@ -81,38 +81,25 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
           val exp = JsonPathExpression.Empty(json)
           val newExp = exp.add(Begin)
           newExp.tokens shouldBe List(Begin)
-          newExp.json shouldBe json
+          newExp.currentSelection shouldBe JsonPathSelection.Single(json)
         }
       }
     }
   }
 
   "JsonPathExpress.generateAll" should {
-    "generate all possible supported jsonpath expressions for object" in {
-      val json = Json.obj(
-        "field1" -> Json.fromInt(1)
-      )
-      val allJsonPath = JsonPathExpression.generateAll(json)
-      allJsonPath.map(_.text).toList should contain theSameElementsAs Seq(
-        "$",
-        "$.field1"
-      )
-    }
-
+    val expressions = Table(
+      "json"                 -> "jsonpath expressions",
+      """{ "field1": 1}"""   -> Seq("$", "$.field1"),
+      """[{ "field1": 1}]"""   -> Seq( "$", "$[0]", "$[-1]", "$[*]", "$[0].field1", "$[-1].field1", "$[*].field1")
+    )
     "generate all possible supported jsonpath expressions" in {
-      val json = Json.arr(
-        Json.obj("field1" -> Json.fromInt(1))
-      )
-      val allJsonPath = JsonPathExpression.generateAll(json)
-      allJsonPath.map(_.text).toList should contain theSameElementsAs Seq(
-        "$",
-        "$[0]",
-        "$[-1]",
-        "$[*]",
-        "$[0].field1",
-        "$[-1].field1",
-        "$[*].field1",
-      )
+      import io.circe.parser._
+      forAll(expressions) { case (jsonString, expected) =>
+        val json = parse(jsonString).getOrElse(fail("Invalid json"))
+        val allJsonPaths = JsonPathExpression.generateAll(json)
+        allJsonPaths.map(_.text) should contain theSameElementsAs expected
+      }
     }
   }
 }
