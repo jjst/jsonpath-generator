@@ -1,10 +1,9 @@
 import io.circe.Json
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-
 import org.scalatest.prop.TableDrivenPropertyChecks._
-
 import JsonPathToken._
+import org.scalatest.AppendedClues.convertToClueful
 
 
 class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
@@ -95,13 +94,19 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
       """[{ "field1": 1}]"""        -> Seq("$", "$[0]", "$[-1]", "$[*]", "$[0].field1", "$[-1].field1", "$[*].field1"),
       """[{ "f1": 1}, {"f2": 2}]""" -> Seq("$", "$[0]", "$[1]", "$[-1]", "$[*]",
                                            "$[0].f1", "$[1].f2", "$[-1].f2", "$[*].f1", "$[*].f2"),
+      """[[1,2],[]]"""              -> Seq("$", "$[0]", "$[1]", "$[-1]", "$[*]",
+                                          "$[0][0]", "$[0][1]","$[0][-1]","$[0][*]",
+                                          "$[*][0]", "$[*][1]","$[*][-1]","$[*][*]",
+                                      )
     )
+
     "generate all possible supported jsonpath expressions" in {
       import io.circe.parser._
       forAll(expressions) { case (jsonString, expected) =>
         val json = parse(jsonString).getOrElse(fail("Invalid json"))
         val allJsonPaths = JsonPathExpression.generateAll(json)
-        allJsonPaths.map(_.text) should contain theSameElementsAs expected
+        val jsonpaths = allJsonPaths.map(_.text).toList
+        jsonpaths should contain theSameElementsAs expected withClue(s"${jsonpaths.toSet.diff(expected.toSet)} - ${expected.toSet.diff(jsonpaths.toSet)}")
       }
     }
   }

@@ -1,6 +1,6 @@
 import JsonPathToken.{IndexArray, SelectField}
-import io.circe
-import io.circe.{Json, JsonNumber, JsonObject}
+import cats.implicits._
+import io.circe.{Json, JsonObject}
 
 case class InvalidJsonPathException(err: String) extends RuntimeException(err)
 
@@ -115,9 +115,13 @@ case class JsonPathExpression(currentSelection: JsonPathSelection, tokens: List[
          json.asArray.fold[JsonPathSelection](JsonPathSelection.Empty)(array => {
            val filtered = index match {
              case ArrayIndex.Selection(indices) =>
-               indices.map { i =>
+               indices.flatMap { i =>
                  // Support negative indices
-                 if (i >= 0) array(i) else array(array.length + i)
+                 val effectiveIndex =
+                   if (i >= 0) i else array.length + i
+                 Either
+                   .catchOnly[IndexOutOfBoundsException](array(effectiveIndex))
+                   .toOption
                }
              case ArrayIndex.Range(from, to) =>
                (from to to).map(array.apply)
