@@ -98,41 +98,41 @@ case class JsonPathExpression(currentSelection: JsonPathSelection, tokens: List[
     }
   }
 
- private def select(selection: JsonPathSelection, token: JsonPathToken): JsonPathSelection = {
-   token match {
-     case JsonPathToken.Begin =>
-       selection
-     case JsonPathToken.SelectField(field) => {
-       selection.flatMap { json =>
-         json.asObject.fold[JsonPathSelection](JsonPathSelection.Empty)(o =>
-           o(field).fold[JsonPathSelection](JsonPathSelection.Empty)(JsonPathSelection.Single.apply)
-         )
-       }
-     }
-     case JsonPathToken.IndexArray(index) => {
-       selection.flatMap { json =>
-         json.asArray.fold[JsonPathSelection](JsonPathSelection.Empty)(array => {
-           val filtered = index match {
-             case ArrayIndex.Selection(indices) =>
-               indices.flatMap { i =>
-                 // Support negative indices
-                 val effectiveIndex =
-                   if (i >= 0) i else array.length + i
-                 Either
-                   .catchOnly[IndexOutOfBoundsException](array(effectiveIndex))
-                   .toOption
-               }
-             case ArrayIndex.Range(from, to) =>
-               (from to to).map(array.apply)
-             case ArrayIndex.Wildcard =>
-               array
-           }
-           JsonPathSelection(filtered)
-         })
-       }
-     }
-   }
- }
+  private def select(selection: JsonPathSelection, token: JsonPathToken): JsonPathSelection = {
+    token match {
+      case JsonPathToken.Begin =>
+        selection
+      case JsonPathToken.SelectField(field) => {
+        selection.flatMap { json =>
+          json.asObject.fold[JsonPathSelection](JsonPathSelection.Empty)(o =>
+            o(field).fold[JsonPathSelection](JsonPathSelection.Empty)(JsonPathSelection.Single.apply)
+          )
+        }
+      }
+      case JsonPathToken.IndexArray(index) => {
+        selection.flatMap { json =>
+          json.asArray.fold[JsonPathSelection](JsonPathSelection.Empty)(array => {
+            val filtered = index match {
+              case ArrayIndex.Selection(indices) =>
+                indices.flatMap { i =>
+                  // Support negative indices
+                  val effectiveIndex =
+                    if (i >= 0) i else array.length + i
+                  Either
+                    .catchOnly[IndexOutOfBoundsException](array(effectiveIndex))
+                    .toOption
+                }
+              case ArrayIndex.Range(from, to) =>
+                (from to to).map(array.apply)
+              case ArrayIndex.Wildcard =>
+                array
+            }
+            JsonPathSelection(filtered)
+          })
+        }
+      }
+    }
+  }
 
   def text: String = {
     tokens.reverse.map(_.text).mkString("")
@@ -158,26 +158,18 @@ object JsonPathExpression {
 
 sealed trait JsonPathToken {
   def text: String
-  def isIndexSelector: Boolean
-  def isFieldSelector: Boolean
 }
 
 object JsonPathToken {
   object Begin extends JsonPathToken {
     val text = "$"
-    override def isIndexSelector: Boolean = false
-    override def isFieldSelector: Boolean = false
   }
 
   case class SelectField(fieldName: String) extends JsonPathToken {
     val text = s".$fieldName"
-    override def isIndexSelector: Boolean = false
-    override def isFieldSelector: Boolean = true
   }
 
   case class IndexArray(index: ArrayIndex) extends JsonPathToken {
-    override def isIndexSelector: Boolean = true
-    override def isFieldSelector: Boolean = false
     val text = {
       val idxText = index match {
         case ArrayIndex.Selection(idx) =>
