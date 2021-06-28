@@ -54,7 +54,6 @@ object JsonPathSelection {
   }
 }
 
-//FIXME: replace Json with `JsonPathSelection`, to address failing test.
 case class JsonPathExpression(currentSelection: JsonPathSelection, tokens: List[JsonPathToken]) {
   private def fieldSelectors(o: JsonObject): Set[JsonPathToken] = {
     o.keys.map(SelectField.apply).toSet
