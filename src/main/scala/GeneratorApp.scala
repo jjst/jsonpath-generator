@@ -13,7 +13,7 @@ object GeneratorApp extends App {
     case Left(failure) => println(failure)
     case Right(json) => {
       val expressions = JsonPathExpression.generateAll(json)
-      println(expressions.toList.map(_.text))
+      println(expressions.toList.map(_.text).size)
     }
   }
 }

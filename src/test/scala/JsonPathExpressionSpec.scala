@@ -125,9 +125,10 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
     "generate valid jsonpath expressions" in {
       val testFiles = Table(
         "Test file",
-        "auto-generated.json",
         "cheriefm.json",
-        "skyrock.json"
+        "skyrock.json",
+        "auto-generated.json",
+        "auto-generated-large.json",
       )
       forAll(testFiles) { testFile =>
         val jsonString = Source.fromResource(s"json/${testFile}").mkString

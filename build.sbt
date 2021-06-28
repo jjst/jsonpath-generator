@@ -4,6 +4,8 @@ organization    := "eu.jjst"
 scalaVersion    := "2.13.4"
 name := "jsonpath-generator"
 
+testOptions in Test += Tests.Argument("-oD")
+
 libraryDependencies ++= Seq(
   "org.json" % "json" % "20210307"
 )
