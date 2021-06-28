@@ -89,9 +89,12 @@ class JsonPathExpressionSpec extends AnyWordSpec with Matchers {
 
   "JsonPathExpress.generateAll" should {
     val expressions = Table(
-      "json"                 -> "jsonpath expressions",
-      """{ "field1": 1}"""   -> Seq("$", "$.field1"),
-      """[{ "field1": 1}]"""   -> Seq( "$", "$[0]", "$[-1]", "$[*]", "$[0].field1", "$[-1].field1", "$[*].field1")
+      "json"                        -> "jsonpath expressions",
+      """{ "field1": 1}"""          -> Seq("$", "$.field1"),
+      """[{}]"""                    -> Seq("$", "$[0]", "$[-1]", "$[*]"),
+      """[{ "field1": 1}]"""        -> Seq("$", "$[0]", "$[-1]", "$[*]", "$[0].field1", "$[-1].field1", "$[*].field1"),
+      """[{ "f1": 1}, {"f2": 2}]""" -> Seq("$", "$[0]", "$[1]", "$[-1]", "$[*]",
+                                           "$[0].f1", "$[1].f2", "$[-1].f2", "$[*].f1", "$[*].f2"),
     )
     "generate all possible supported jsonpath expressions" in {
       import io.circe.parser._
